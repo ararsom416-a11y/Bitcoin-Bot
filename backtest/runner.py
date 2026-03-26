@@ -22,6 +22,12 @@ Why walk-forward validation?
   A robust strategy shows consistent Sharpe ratio across ALL folds (low std dev).
 """
 
+# Path bootstrap — makes `import config` work whether this file is run as
+# `python backtest/runner.py` or `python -m backtest.runner`.
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+del _sys, _pathlib
+
 import warnings
 from datetime import datetime
 

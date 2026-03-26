@@ -15,6 +15,10 @@ Design principles:
     can be "forgotten" if the bot restarts or crashes after entry.
 """
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+del _sys, _pathlib
+
 import math
 
 import ccxt

@@ -13,6 +13,10 @@ Design principle — non-destructive:
   The caller's original DataFrame is never mutated.
 """
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+del _sys, _pathlib
+
 import pandas as pd
 from loguru import logger
 from ta.momentum import RSIIndicator

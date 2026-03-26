@@ -21,6 +21,10 @@ Design note — "second-to-last row" rule:
   The second-to-last candle is fully closed and its values are final.
 """
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+del _sys, _pathlib
+
 from datetime import datetime, timezone
 
 from loguru import logger
