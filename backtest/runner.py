@@ -182,25 +182,43 @@ def run_backtest(
     entries, exits = _generate_signals(df)
     sl_frac, tp_frac = _compute_sl_tp_arrays(df)
 
+    # --- Step 3b: Compute per-bar position sizes (ATR-based fixed-fraction) ---
+    # This replicates the live bot's risk math for each historical bar:
+    #   risk_amount    = balance × MAX_RISK_PCT           (e.g. 2% of equity)
+    #   stop_distance  = ATR × STOP_MULTIPLIER            (e.g. 1.5 × ATR)
+    #   position_usd   = risk_amount / stop_distance × close
+    #   position_frac  = position_usd / balance  =  MAX_RISK_PCT / sl_frac
+    # sl_frac = (ATR × 1.5) / close, so:
+    #   position_frac  = MAX_RISK_PCT / sl_frac
+    # Clamp to MAX_POSITION_SIZE_PCT to avoid runaway sizes when ATR is tiny.
+    size_array = (config.MAX_RISK_PER_TRADE_PCT / sl_frac).clip(
+        upper=config.MAX_POSITION_SIZE_PCT
+    )
+    # Replace any inf/NaN (e.g. if ATR is 0) with the minimum viable fraction.
+    size_array = size_array.replace([np.inf, -np.inf], config.MAX_POSITION_SIZE_PCT)
+    size_array = size_array.fillna(config.MAX_RISK_PER_TRADE_PCT)
+
     # --- Step 4: Run vectorbt simulation ---
     close_series = df["close"]
 
     # vectorbt.Portfolio.from_signals() simulates a full trading history.
-    # init_cash: starting capital.
-    # fees: commission per trade (0.1% = 0.001).
+    # init_cash:    starting capital.
+    # fees:         commission per trade (0.1% = 0.001).
     # sl_stop / tp_stop: fractional distances for auto stop/TP management.
+    # size:         per-bar target allocation as fraction of equity (0.0–1.0).
+    # size_type:    "targetpercent" — size is fraction of current equity value.
     # Upon conflict (both entry and exit on same bar), vectorbt uses the exit.
     portfolio = vbt.Portfolio.from_signals(
         close=close_series,
         entries=entries,
         exits=exits,
-        sl_stop=sl_frac,           # Stop-loss: ATR × 1.5 / close
-        tp_stop=tp_frac,           # Take-profit: ATR × 2.5 / close
+        sl_stop=sl_frac,                       # Stop-loss: ATR × 1.5 / close
+        tp_stop=tp_frac,                       # Take-profit: ATR × 2.5 / close
         init_cash=config.ACCOUNT_BALANCE,
         fees=config.BACKTEST_COMMISSION,
         freq=timeframe,
-        size=np.nan,               # Size determined by position-aware logic below
-        size_type="targetpercent", # Use percent of equity (closest to our risk model)
+        size=size_array,                       # ATR-derived fractional position sizing
+        size_type="targetpercent",             # size is fraction of current equity
     )
 
     # --- Step 5: Extract statistics ---

@@ -24,7 +24,6 @@ Position sizing math (Fixed Fractional / partial Kelly):
   mathematically optimal but practically leads to ruin in crypto markets.
 """
 
-from datetime import datetime, timezone
 from copy import deepcopy
 
 from loguru import logger

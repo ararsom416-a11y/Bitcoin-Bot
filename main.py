@@ -52,7 +52,7 @@ from execution.trader import (
     place_market_order,
     place_oco_order,
     cancel_all_orders,
-    get_account_balance,
+    get_account_balance,  # used to sync balance with exchange at startup
     round_quantity,
 )
 
@@ -309,6 +309,20 @@ def main() -> None:
     if not test_connection():
         console.print("[bold red]ERROR: Cannot connect to Binance. Check .env API keys and network.[/bold red]")
         sys.exit(1)
+
+    # --- Sync starting balance from exchange ---
+    # This ensures our internal accounting matches actual funds on the exchange,
+    # catching discrepancies from previous sessions or manual transfers.
+    exchange_balance = get_account_balance("USDT")
+    if exchange_balance > 0:
+        portfolio_state["balance"]      = exchange_balance
+        portfolio_state["peak_balance"] = exchange_balance
+        logger.info(f"Balance synced from exchange: ${exchange_balance:,.2f} USDT")
+    else:
+        logger.warning(
+            f"Could not read exchange balance (got ${exchange_balance:.2f}). "
+            "Using config.ACCOUNT_BALANCE as starting balance."
+        )
 
     # --- Initial data quality check ---
     logger.info("Fetching initial candles for data quality check...")

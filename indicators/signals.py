@@ -123,8 +123,6 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # --- Volume SMA ---
     # Rolling 20-period average volume — useful for confirming breakouts.
     # High volume + price expansion = more reliable signal.
-    df["volume_sma"] = close.rolling(window=20).mean()  # intentionally uses close
-    # Correction: volume SMA should be computed on volume, not close.
     df["volume_sma"] = df["volume"].rolling(window=20).mean()
 
     # --- Drop NaN rows (indicator warm-up period) ---

@@ -54,9 +54,9 @@ def evaluate_signal(df) -> dict:
     Raises:
         ValueError: If the DataFrame does not have enough rows to evaluate.
     """
-    if len(df) < 2:
+    if len(df) < 3:
         raise ValueError(
-            f"DataFrame must have at least 2 rows to evaluate a signal. Got {len(df)}."
+            f"DataFrame must have at least 3 rows to evaluate a signal. Got {len(df)}."
         )
 
     # The "current" closed candle — this is what we trade on.

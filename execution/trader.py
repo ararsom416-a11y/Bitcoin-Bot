@@ -16,7 +16,6 @@ Design principles:
 """
 
 import math
-import time
 
 import ccxt
 from loguru import logger
