@@ -168,9 +168,9 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 # Standalone test — run `python indicators/signals.py` from the project root
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
     from loguru import logger
-    import sys
-    sys.path.insert(0, ".")
 
     from data.fetcher import fetch_ohlcv
 

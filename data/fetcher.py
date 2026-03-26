@@ -230,6 +230,11 @@ def test_connection() -> bool:
 # Standalone test — run `python data/fetcher.py` from the project root to verify
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import sys, pathlib
+    # Ensure the project root is on the path so `import config` works when
+    # this file is run directly as `python data/fetcher.py`.
+    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
     # Reconfigure the already-imported loguru logger for console-only standalone output.
     logger.remove()
     logger.add(
