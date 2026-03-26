@@ -152,6 +152,11 @@ WALKFORWARD_FOLDS: int = 5
 # Prevents look-ahead leakage caused by indicators spanning the fold boundary.
 WALKFORWARD_EMBARGO_FRAC: float = 0.1
 
+# Number of Monte Carlo simulations for bootstrap trade-sequence analysis.
+# 1000 runs in < 1 second and gives reliable confidence intervals.
+# Increase to 10000 for tighter intervals at the cost of ~10s runtime.
+MONTE_CARLO_SIMULATIONS: int = 1000
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
