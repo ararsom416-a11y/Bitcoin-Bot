@@ -209,23 +209,24 @@ def run_backtest(
     close_series = df["close"]
 
     # vectorbt.Portfolio.from_signals() simulates a full trading history.
-    # init_cash:    starting capital.
-    # fees:         commission per trade (0.1% = 0.001).
+    # init_cash:  starting capital.
+    # fees:       commission per trade (0.1% = 0.001).
     # sl_stop / tp_stop: fractional distances for auto stop/TP management.
-    # size:         per-bar target allocation as fraction of equity (0.0–1.0).
-    # size_type:    "targetpercent" — size is fraction of current equity value.
+    # size:       per-bar fraction of available cash to allocate (0.0–1.0).
+    # size_type:  "percent" — size is fraction of available cash.
+    #             ("targetpercent" is not supported in all vectorbt versions.)
     # Upon conflict (both entry and exit on same bar), vectorbt uses the exit.
     portfolio = vbt.Portfolio.from_signals(
         close=close_series,
         entries=entries,
         exits=exits,
-        sl_stop=sl_frac,                       # Stop-loss: ATR × 1.5 / close
-        tp_stop=tp_frac,                       # Take-profit: ATR × 2.5 / close
+        sl_stop=sl_frac,                  # Stop-loss: ATR × 1.5 / close
+        tp_stop=tp_frac,                  # Take-profit: ATR × 2.5 / close
         init_cash=config.ACCOUNT_BALANCE,
         fees=config.BACKTEST_COMMISSION,
         freq=timeframe,
-        size=size_array,                       # ATR-derived fractional position sizing
-        size_type="targetpercent",             # size is fraction of current equity
+        size=size_array,                  # ATR-derived fractional position sizing
+        size_type="percent",              # size is fraction of available cash
     )
 
     # --- Step 5: Extract statistics ---
