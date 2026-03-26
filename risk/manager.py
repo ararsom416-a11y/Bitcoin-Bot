@@ -64,16 +64,17 @@ def make_initial_portfolio_state(starting_balance: float = config.ACCOUNT_BALANC
         dict: Initialised portfolio state with all fields set to safe defaults.
     """
     return {
-        "balance":            starting_balance,
-        "peak_balance":       starting_balance,
-        "daily_pnl":          0.0,
-        "total_pnl":          0.0,
-        "consecutive_losses": 0,
-        "trades_today":       0,
-        "open_position":      None,
-        "trade_history":      [],
-        "halted":             False,
-        "halt_reason":        "",
+        "balance":              starting_balance,
+        "peak_balance":         starting_balance,
+        "start_of_day_balance": starting_balance,  # reference for daily loss limit
+        "daily_pnl":            0.0,
+        "total_pnl":            0.0,
+        "consecutive_losses":   0,
+        "trades_today":         0,
+        "open_position":        None,
+        "trade_history":        [],
+        "halted":               False,
+        "halt_reason":          "",
     }
 
 
@@ -185,13 +186,16 @@ def approve_trade(signal: dict, portfolio_state: dict) -> tuple[bool, str]:
         logger.debug(f"Trade blocked: {reason}")
         return False, reason
 
-    balance       = portfolio_state["balance"]
-    daily_pnl     = portfolio_state["daily_pnl"]
-    peak_balance  = portfolio_state["peak_balance"]
+    balance           = portfolio_state["balance"]
+    daily_pnl         = portfolio_state["daily_pnl"]
+    peak_balance      = portfolio_state["peak_balance"]
+    start_of_day_bal  = portfolio_state.get("start_of_day_balance", balance)
 
     # --- Check 4: Daily loss circuit breaker ---
-    # daily_pnl is negative when we have losses today.
-    max_daily_loss = balance * config.MAX_DAILY_LOSS_PCT
+    # Compare against start-of-day balance, not current balance.
+    # Using current balance would raise the threshold whenever we profit mid-day,
+    # making the circuit breaker progressively weaker throughout a winning session.
+    max_daily_loss = start_of_day_bal * config.MAX_DAILY_LOSS_PCT
     if daily_pnl < -max_daily_loss:
         reason = (
             f"Daily loss ${abs(daily_pnl):.2f} exceeds limit "
@@ -331,8 +335,10 @@ def reset_daily_state(portfolio_state: dict) -> dict:
         Updated portfolio_state with daily counters zeroed.
     """
     old_daily = portfolio_state["daily_pnl"]
-    portfolio_state["daily_pnl"]    = 0.0
-    portfolio_state["trades_today"] = 0
+    portfolio_state["daily_pnl"]              = 0.0
+    portfolio_state["trades_today"]           = 0
+    # Reset the daily reference balance so the new day's 5% limit is correct.
+    portfolio_state["start_of_day_balance"]   = portfolio_state["balance"]
 
     logger.info(
         f"Daily state reset at UTC midnight. "
@@ -376,10 +382,11 @@ def _check_post_trade_circuit_breakers(portfolio_state: dict) -> None:
     if portfolio_state["halted"]:
         return  # Already halted.
 
-    balance      = portfolio_state["balance"]
-    peak         = portfolio_state["peak_balance"]
-    daily_pnl    = portfolio_state["daily_pnl"]
-    streak       = portfolio_state["consecutive_losses"]
+    balance           = portfolio_state["balance"]
+    peak              = portfolio_state["peak_balance"]
+    daily_pnl         = portfolio_state["daily_pnl"]
+    streak            = portfolio_state["consecutive_losses"]
+    start_of_day_bal  = portfolio_state.get("start_of_day_balance", balance)
 
     # Drawdown check.
     drawdown = (peak - balance) / peak if peak > 0 else 0.0
@@ -390,8 +397,8 @@ def _check_post_trade_circuit_breakers(portfolio_state: dict) -> None:
         )
         return
 
-    # Daily loss check.
-    max_daily = balance * config.MAX_DAILY_LOSS_PCT
+    # Daily loss check — use start-of-day balance as the reference point.
+    max_daily = start_of_day_bal * config.MAX_DAILY_LOSS_PCT
     if daily_pnl < -max_daily:
         _trigger_circuit_breaker(
             portfolio_state,

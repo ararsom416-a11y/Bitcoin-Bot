@@ -25,7 +25,6 @@ Exit:
   Ctrl-C triggers a graceful shutdown — all open orders are cancelled before exit.
 """
 
-import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -52,7 +51,8 @@ from execution.trader import (
     place_market_order,
     place_oco_order,
     cancel_all_orders,
-    get_account_balance,  # used to sync balance with exchange at startup
+    get_open_orders,
+    get_account_balance,
     round_quantity,
 )
 
@@ -361,13 +361,56 @@ def main() -> None:
 
             # --- Step 3: Open position — check for exit ---
             if portfolio_state["open_position"] is not None:
+                pos = portfolio_state["open_position"]
+
+                # --- OCO fill detection ---
+                # The OCO bracket (stop-loss + take-profit) lives on the exchange.
+                # If one leg filled between loops, Binance closes both legs and we
+                # have no BTC left.  Without this check, the bot would try to sell
+                # BTC it doesn't own, causing an InsufficientFunds error and leaving
+                # the portfolio_state stuck showing an open position forever.
+                open_orders = get_open_orders(config.SYMBOL)
+                if not open_orders:
+                    # No open orders → OCO was filled while we weren't watching.
+                    # Determine which leg filled and at what price.
+                    actual_balance = get_account_balance("USDT")
+                    pnl_usd = actual_balance - portfolio_state["balance"]
+                    exit_price = pos["entry_price"] + (pnl_usd / pos["quantity"]) if pos["quantity"] > 0 else current_price
+
+                    # Infer exit reason from the price level that was hit.
+                    if exit_price >= pos["take_profit"] * 0.995:
+                        exit_reason = "take_profit"
+                    elif exit_price <= pos["stop_loss"] * 1.005:
+                        exit_reason = "stop_loss"
+                    else:
+                        exit_reason = "oco_filled"  # filled somewhere in between
+
+                    logger.info(
+                        f"OCO bracket detected as filled (no open orders). "
+                        f"exit_price≈${exit_price:.2f} | reason={exit_reason} | "
+                        f"PnL≈${pnl_usd:+.2f}"
+                    )
+
+                    pnl_pct = pnl_usd / (pos["entry_price"] * pos["quantity"]) if pos["quantity"] > 0 else 0.0
+                    trade_result = {
+                        "pnl_usd":     pnl_usd,
+                        "pnl_pct":     pnl_pct,
+                        "exit_reason": exit_reason,
+                        "entry_price": pos["entry_price"],
+                        "exit_price":  exit_price,
+                        "quantity":    pos["quantity"],
+                        "entry_time":  pos.get("entry_time", ""),
+                        "exit_time":   datetime.now(timezone.utc).isoformat(),
+                    }
+                    update_portfolio_state(trade_result, portfolio_state)
+
                 # Check if the signal has reversed (EMA crossover exit condition).
-                if check_exit_condition(df, portfolio_state["open_position"]):
+                elif check_exit_condition(df, pos):
                     close_position(portfolio_state, current_price, "signal_exit")
                 else:
                     logger.debug(
                         f"Position open — no exit signal. "
-                        f"P&L estimate: ${(current_price - portfolio_state['open_position']['entry_price']) * portfolio_state['open_position']['quantity']:+.2f}"
+                        f"P&L estimate: ${(current_price - pos['entry_price']) * pos['quantity']:+.2f}"
                     )
 
             # --- Step 4: No open position — look for new entry ---

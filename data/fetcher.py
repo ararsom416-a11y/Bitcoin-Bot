@@ -122,8 +122,9 @@ def fetch_ohlcv(
 
         except ccxt.RateLimitExceeded as exc:
             # The exchange told us we're sending too many requests.
-            # Back off longer than usual — Binance resets rate limits every minute.
-            wait = config.API_RETRY_BASE_SLEEP * (2 ** attempt)
+            # Back off with the same schedule as other transient errors.
+            # attempt is 1-indexed: attempt=1 → 2s, attempt=2 → 4s, attempt=3 → 8s.
+            wait = config.API_RETRY_BASE_SLEEP * (2 ** (attempt - 1))
             logger.warning(
                 f"Rate limit exceeded (attempt {attempt}). "
                 f"Sleeping {wait}s before retry. Detail: {exc}"
@@ -141,7 +142,7 @@ def fetch_ohlcv(
             time.sleep(wait)
 
         except ccxt.ExchangeNotAvailable as exc:
-            wait = config.API_RETRY_BASE_SLEEP * (2 ** attempt)
+            wait = config.API_RETRY_BASE_SLEEP * (2 ** (attempt - 1))
             logger.warning(
                 f"Exchange not available (attempt {attempt}). "
                 f"Sleeping {wait}s. Detail: {exc}"
@@ -156,7 +157,7 @@ def fetch_ohlcv(
             raise
 
         except ValueError as exc:
-            # Empty response — worth retrying in case of transient issue.
+            # Empty or malformed response — worth retrying.
             wait = config.API_RETRY_BASE_SLEEP * (2 ** (attempt - 1))
             logger.warning(
                 f"Empty response (attempt {attempt}): {exc}. Retrying in {wait}s."
@@ -229,9 +230,7 @@ def test_connection() -> bool:
 # Standalone test — run `python data/fetcher.py` from the project root to verify
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    from loguru import logger
-
-    # Simple console-only logger for standalone testing.
+    # Reconfigure the already-imported loguru logger for console-only standalone output.
     logger.remove()
     logger.add(
         sink=lambda msg: print(msg, end=""),

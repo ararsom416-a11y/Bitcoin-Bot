@@ -100,7 +100,10 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # Band Width normalised by the middle band.
     # This makes BBW comparable across different price levels and assets.
     # Expanding BBW → the market is breaking out of consolidation.
-    df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["bb_middle"]
+    # Guard against division by zero (bb_middle = 0 is theoretically possible
+    # if all closes in the window were 0, though effectively impossible on BTC).
+    bb_middle_safe = df["bb_middle"].replace(0, float("nan"))
+    df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / bb_middle_safe
 
     # --- ATR (Volatility Measure for Stop/TP Placement) ---
     # ATR measures the average range between high and low over N periods.

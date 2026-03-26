@@ -35,8 +35,9 @@ from data.fetcher import fetch_ohlcv
 from indicators.signals import compute_indicators
 
 
-# Suppress vectorbt deprecation warnings for cleaner output.
-warnings.filterwarnings("ignore", category=FutureWarning)
+# Suppress vectorbt's own FutureWarnings only — leave other libraries' warnings visible.
+warnings.filterwarnings("ignore", category=FutureWarning, module="vectorbt")
+warnings.filterwarnings("ignore", category=FutureWarning, module="numba")
 
 
 # ---------------------------------------------------------------------------

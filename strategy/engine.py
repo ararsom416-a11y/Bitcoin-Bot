@@ -63,7 +63,8 @@ def evaluate_signal(df) -> dict:
     row = df.iloc[-2]
 
     # Previous closed candle — needed for BBW expansion check.
-    prev = df.iloc[-3] if len(df) >= 3 else df.iloc[-2]
+    # len(df) >= 3 is guaranteed by the guard above, so this is always safe.
+    prev = df.iloc[-3]
 
     # --- Extract indicator values ---
     ema_fast     = row["ema_fast"]
